@@ -60,11 +60,13 @@ Copy `.env.example` to `.env.local` and configure:
 - `signups`: New member signups with membership types (Integrity/Legacy/Special/ASP)
 - `cancellations`: Membership cancellations with reasons and age categories
 - `holds`: Membership holds with start/end dates and fees
+- `user_profiles`: User profile information (full_name, avatar_url)
 - `settings`: Application settings storage
 
 **Key Relationships:**
 - `intros` → `intro_class_history` (one-to-many): Track multiple class attendances
 - `intros` → `follow_up_notes` (one-to-many): Track follow-up conversations
+- `user_profiles` → `auth.users` (one-to-one): User profile data linked to Supabase auth
 
 **Database Functions & Triggers:**
 - Auto-sets `created_by` field on INSERT using `set_created_by()` trigger
@@ -92,6 +94,7 @@ Each table has a dedicated data access module in `app/lib/supabase/`:
 - `signups.ts`: Signup CRUD operations
 - `cancellations.ts`: Cancellation CRUD operations
 - `holds.ts`: Hold CRUD operations
+- `profiles.ts`: User profile management, avatar upload/delete, password updates, account deletion
 - `settings.ts`: Settings management
 
 **Pagination Pattern:**
@@ -109,6 +112,8 @@ Each table has a dedicated data access module in `app/lib/supabase/`:
 - `app/page.tsx`: Main dashboard with tab navigation
 - `app/layout.tsx`: Root layout with ErrorBoundary, AuthProvider, and Portal
 - `app/login/page.tsx`: Login page
+- `app/profile/page.tsx`: User profile management page (edit profile, change password, delete account)
+- `app/reset-password/page.tsx`: Password reset page
 
 **Tab Components** (`app/components/tabs/`):
 - Each tab is a self-contained feature module (OverviewTab, IntrosTab, SignupsTab, etc.)
@@ -121,9 +126,55 @@ Each table has a dedicated data access module in `app/lib/supabase/`:
 **Modal Components** (`app/components/tabs/modals/`):
 - Modal dialogs for detailed views and editing
 
+**Layout Components** (`app/components/layout/`):
+- `Header.tsx`: Application header with logo and settings
+- `Navigation.tsx`: Sidebar navigation menu
+- `ProfileSection.tsx`: User profile widget in sidebar (shows avatar, name, email)
+- `Sidebar.tsx`: Main sidebar container with navigation and profile section
+
 **UI Components** (`app/components/ui/`):
 - Reusable UI primitives
 - `portal.tsx`: Renders modals outside component hierarchy
+
+### Profile Management
+
+**Profile Features:**
+- User profile page at `/profile` with comprehensive account management
+- Profile information (full name, email, avatar)
+- Avatar upload to Supabase Storage (avatars bucket)
+- Password change with strength validation
+- Account deletion with two-step confirmation
+
+**Data Access Layer** (`app/lib/supabase/profiles.ts`):
+- `fetchUserProfile(userId)`: Get user profile by ID
+- `updateUserProfile(userId, updates)`: Update profile fields (full_name, avatar_url)
+- `createUserProfile(profileData)`: Create new user profile
+- `uploadProfileAvatar(userId, file)`: Upload avatar to storage and update profile
+- `deleteProfileAvatar(userId)`: Remove avatar from storage and database
+- `updateUserPassword(newPassword)`: Update user password with validation
+- `deleteUserAccount(userId)`: Delete user profile, avatar, and auth account
+- `subscribeToProfile(userId, callback)`: Real-time profile updates
+
+**Avatar Management:**
+- Stored in Supabase Storage `avatars` bucket
+- File validation: max 5MB, types: JPEG, PNG, WebP, GIF
+- Auto-deletes old avatar when uploading new one
+- File naming: `{userId}_{timestamp}.{ext}`
+
+**Password Validation:**
+- Minimum 8 characters
+- Must contain uppercase, lowercase, and number
+- Strength indicator in UI (Very Weak → Strong)
+
+**Account Deletion:**
+- Two-step confirmation process
+- Requires typing "DELETE" to confirm
+- Deletes avatar, profile, and auth account
+- Cannot be undone
+
+**Profile Components:**
+- `ProfileSection.tsx`: Sidebar widget showing avatar and user info
+- `ProfilePage`: Full profile management page at `/profile`
 
 ### CSV Import Functionality
 
