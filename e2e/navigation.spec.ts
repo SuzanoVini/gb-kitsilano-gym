@@ -21,7 +21,7 @@ test.describe('Navigation', () => {
     // Verify all 6 tab buttons are present in one test to avoid repeated logins
     const tabs = ['Overview', 'Insights', 'Intros', 'Sign-ups', 'Cancellations', 'Holds'];
     for (const tab of tabs) {
-      await expect(page.getByRole('button', { name: new RegExp(tab, 'i') })).toBeVisible();
+      await expect(page.getByRole('button', { name: tab, exact: true })).toBeVisible();
     }
   });
 });

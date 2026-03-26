@@ -12,7 +12,7 @@ test.describe('Cancellations Tab', () => {
   });
 
   test('Cancellations heading is visible', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: /cancellations/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Cancellations', exact: true })).toBeVisible();
   });
 
   test('table or list area is present', async ({ page }) => {

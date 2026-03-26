@@ -12,7 +12,7 @@ test.describe('Signups Tab', () => {
   });
 
   test('Sign-ups heading is visible', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: /sign.ups/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sign-ups', exact: true })).toBeVisible();
   });
 
   test('table or list area is present', async ({ page }) => {

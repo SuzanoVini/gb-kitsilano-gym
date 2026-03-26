@@ -14,7 +14,7 @@ test.describe('Intros Tab', () => {
   test('table or list area is present', async ({ page }) => {
     // IntrosTab renders a Table component with a scrollable container
     await expect(
-      page.locator('main table, main [role="table"], main .overflow-x-auto')
+      page.locator('main table, main [role="table"], main .overflow-x-auto').first()
     ).toBeVisible();
   });
 

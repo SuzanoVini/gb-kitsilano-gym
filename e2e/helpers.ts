@@ -16,7 +16,7 @@ export async function login(page: Page): Promise<void> {
 }
 
 export async function goToTab(page: Page, tabName: string): Promise<void> {
-  await page.getByRole('button', { name: new RegExp(tabName, 'i') }).click();
+  await page.getByRole('button', { name: tabName, exact: true }).click();
   await page.waitForLoadState('domcontentloaded');
   // Wait for the main content area to be visible after navigation
   await page.locator('main').waitFor({ state: 'visible' });
