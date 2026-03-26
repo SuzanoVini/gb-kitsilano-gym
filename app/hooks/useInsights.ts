@@ -327,33 +327,26 @@ You're above industry average. Time to scale.`,
     }
 
     // NS-1: Retention Momentum (30-day vs prior 30-day comparison)
+    // Use actual event dates: membership_date for signups, cancellation date for cancellations
     const now = new Date();
+    const getSignupEventDate = (s: (typeof signups)[0]) =>
+      s.membership_date ? new Date(s.membership_date) : new Date(s.created_at);
+    const getCancelEventDate = (c: (typeof cancellations)[0]) =>
+      c.date ? new Date(c.date) : new Date(c.created_at);
     const recentSignups = signups.filter((s) => {
-      if (!s.created_at) {
-        return false;
-      }
-      const daysAgo = (now.getTime() - new Date(s.created_at).getTime()) / (1000 * 60 * 60 * 24);
+      const daysAgo = (now.getTime() - getSignupEventDate(s).getTime()) / (1000 * 60 * 60 * 24);
       return daysAgo <= 30;
     }).length;
     const priorSignups = signups.filter((s) => {
-      if (!s.created_at) {
-        return false;
-      }
-      const daysAgo = (now.getTime() - new Date(s.created_at).getTime()) / (1000 * 60 * 60 * 24);
+      const daysAgo = (now.getTime() - getSignupEventDate(s).getTime()) / (1000 * 60 * 60 * 24);
       return daysAgo > 30 && daysAgo <= 60;
     }).length;
     const recentCancels = cancellations.filter((c) => {
-      if (!c.created_at) {
-        return false;
-      }
-      const daysAgo = (now.getTime() - new Date(c.created_at).getTime()) / (1000 * 60 * 60 * 24);
+      const daysAgo = (now.getTime() - getCancelEventDate(c).getTime()) / (1000 * 60 * 60 * 24);
       return daysAgo <= 30;
     }).length;
     const priorCancels = cancellations.filter((c) => {
-      if (!c.created_at) {
-        return false;
-      }
-      const daysAgo = (now.getTime() - new Date(c.created_at).getTime()) / (1000 * 60 * 60 * 24);
+      const daysAgo = (now.getTime() - getCancelEventDate(c).getTime()) / (1000 * 60 * 60 * 24);
       return daysAgo > 30 && daysAgo <= 60;
     }).length;
 
@@ -446,10 +439,18 @@ This concentration points to a retention issue specific to this demographic.`,
     const expiredHolds = holdsToUse.filter((h) => h.end && new Date(h.end) < now);
 
     if (expiredHolds.length >= 5) {
-      const signupNames = new Set(signups.map((s) => s.name.toLowerCase().trim()));
-      const returnedCount = expiredHolds.filter((h) =>
-        signupNames.has(h.name.toLowerCase().trim())
-      ).length;
+      // A hold member "returned" if they did NOT cancel after the hold end date.
+      // Members on hold were already members — they won't appear in signups again.
+      const returnedCount = expiredHolds.filter((h) => {
+        const holdEndDate = new Date(h.end as string);
+        return !cancellations.some((c) => {
+          if (c.name.toLowerCase().trim() !== h.name.toLowerCase().trim()) {
+            return false;
+          }
+          const cancelDate = getCancelEventDate(c);
+          return cancelDate > holdEndDate;
+        });
+      }).length;
       const returnRate = (returnedCount / expiredHolds.length) * 100;
       const missedReturns = expiredHolds.length - returnedCount;
 
@@ -528,10 +529,7 @@ After 30 days conversion drops to under 10%. A personal, compelling offer is the
 
     // NS-5: Recent Signup Package Gap (signups in last 30 days without a package)
     const recentSignupsAll = signups.filter((s) => {
-      if (!s.created_at) {
-        return false;
-      }
-      const daysAgo = (now.getTime() - new Date(s.created_at).getTime()) / (1000 * 60 * 60 * 24);
+      const daysAgo = (now.getTime() - getSignupEventDate(s).getTime()) / (1000 * 60 * 60 * 24);
       return daysAgo <= 30;
     });
     const recentWithoutPkg = recentSignupsAll.filter((s) => !s.signup_package);
@@ -559,10 +557,7 @@ These members are still in their honeymoon phase — the best window to upsell.`
 
     // NS-6: Re-Engagement Window (cancelled in last 60 days for recoverable reasons)
     const reEngageable = cancellations.filter((c) => {
-      if (!c.created_at) {
-        return false;
-      }
-      const daysAgo = (now.getTime() - new Date(c.created_at).getTime()) / (1000 * 60 * 60 * 24);
+      const daysAgo = (now.getTime() - getCancelEventDate(c).getTime()) / (1000 * 60 * 60 * 24);
       if (daysAgo > 60) {
         return false;
       }

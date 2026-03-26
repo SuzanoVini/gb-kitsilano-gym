@@ -15,6 +15,12 @@ import IntroForm from './forms/IntroForm';
 import FollowUpModal from './modals/FollowUpModal';
 import SettingsModal from './modals/SettingsModal';
 
+// Derive year from intro.date (full ISO string) or fall back to created_at
+function getIntroYear(intro: Intro): string {
+  const d = intro.date ? new Date(intro.date) : new Date(intro.created_at);
+  return Number.isNaN(d.getTime()) ? '' : String(d.getFullYear());
+}
+
 export default function IntrosTab() {
   const { intros, loading, error, addIntro, editIntro, removeIntro, refresh } = useIntros();
   const { modals, openModal, closeModal } = useUIStore();
@@ -29,6 +35,12 @@ export default function IntrosTab() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importPreviewData, setImportPreviewData] = useState<IntroCsvRecord[]>([]);
 
+  // Build sorted list of available years from data
+  const availableYears = useMemo(() => {
+    const years = new Set(intros.map(getIntroYear).filter(Boolean));
+    return Array.from(years).sort((a, b) => Number(b) - Number(a)); // newest first
+  }, [intros]);
+
   // Filter and search intros
   const filteredIntros = useMemo(() => {
     return intros.filter((intro: Intro) => {
@@ -38,12 +50,20 @@ export default function IntrosTab() {
         intro.email?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
         intro.phone?.includes(filters.searchTerm);
 
+      const matchesYear = filters.year === 'all' || getIntroYear(intro) === filters.year;
       const matchesMonth = filters.month === 'all' || intro.month === filters.month;
       const matchesStaff = filters.staff === 'all' || intro.staff === filters.staff;
       const matchesClass = filters.class === 'all' || intro.class === filters.class;
       const matchesStatus = filters.status === 'all' || intro.status === filters.status;
 
-      return matchesSearch && matchesMonth && matchesStaff && matchesClass && matchesStatus;
+      return (
+        matchesSearch &&
+        matchesYear &&
+        matchesMonth &&
+        matchesStaff &&
+        matchesClass &&
+        matchesStatus
+      );
     });
   }, [intros, filters]);
 
@@ -361,7 +381,7 @@ export default function IntrosTab() {
 
       {/* Filters */}
       <div className="section-container">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <input
             type="text"
             placeholder="Search by name, email, or phone..."
@@ -369,6 +389,18 @@ export default function IntrosTab() {
             onChange={(e) => setFilters({ searchTerm: e.target.value })}
             className="form-input"
           />
+          <select
+            value={filters.year}
+            onChange={(e) => setFilters({ year: e.target.value })}
+            className="form-select"
+          >
+            <option value="all">All Years</option>
+            {availableYears.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
           <select
             value={filters.month}
             onChange={(e) => setFilters({ month: e.target.value })}

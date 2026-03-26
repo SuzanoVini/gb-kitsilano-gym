@@ -360,6 +360,7 @@ export interface LoadingState {
  */
 export interface FilterState {
   month: string;
+  year: string;
   staff: string;
   class: string;
   status: StatusFilter;
