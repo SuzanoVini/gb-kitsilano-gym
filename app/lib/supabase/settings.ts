@@ -9,7 +9,8 @@ export const fetchSettings = async (key: string) => {
     console.error(`Error fetching settings for ${key}:`, error);
 
     // Fallback defaults if database fails
-    const defaults: Record<string, string[]> = {
+    // biome-ignore lint/suspicious/noExplicitAny: Settings defaults include both string[] and object[]
+    const defaults: Record<string, any[]> = {
       class_types: [
         'GB1',
         'GB 1/2',
@@ -60,6 +61,15 @@ export const fetchSettings = async (key: string) => {
       ],
       hold_reasons: ['Injury', 'Illness', 'Travel', 'Break Time', 'Work', 'No reason', 'Other'],
       age_categories: ['3-6 YO', '7-9 YO', '10-15 YO', 'Adult'],
+      membership_prices: [
+        { type: 'Special', price: 125 },
+        { type: 'Integrity', price: 165 },
+        { type: 'Legacy', price: 225 },
+      ],
+      signup_package_prices: [
+        { type: 'Adults', price: 295 },
+        { type: 'Kids', price: 235 },
+      ],
     };
 
     return defaults[key] || [];

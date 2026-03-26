@@ -1,10 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { Cancellation, Hold, Insight, Intro, Signup } from '@/types';
-
-const MONTHLY_MEMBERSHIP_REVENUE = 180;
-const SIGNUP_PACKAGE_REVENUE = 200;
+import type { Cancellation, Hold, Insight, Intro, PriceEntry, Signup } from '@/types';
 
 interface UseInsightsProps {
   intros: Intro[];
@@ -12,6 +9,8 @@ interface UseInsightsProps {
   cancellations: Cancellation[];
   holds: Hold[];
   rawHolds?: Hold[]; // Unfiltered holds for return-rate calculation (hold relevance is by end date, not created_at)
+  membershipPrices?: PriceEntry[];
+  signupPackagePrices?: PriceEntry[];
 }
 
 export const useInsights = ({
@@ -20,9 +19,24 @@ export const useInsights = ({
   cancellations,
   holds,
   rawHolds,
+  membershipPrices,
+  signupPackagePrices,
 }: UseInsightsProps) => {
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Insight generation aggregates many business rules.
   const insights = useMemo(() => {
+    // Compute average revenue from configurable prices, with sensible fallbacks
+    const avgMonthlyRevenue =
+      membershipPrices && membershipPrices.length > 0
+        ? Math.round(
+            membershipPrices.reduce((sum, p) => sum + p.price, 0) / membershipPrices.length
+          )
+        : 165;
+    const avgPackageRevenue =
+      signupPackagePrices && signupPackagePrices.length > 0
+        ? Math.round(
+            signupPackagePrices.reduce((sum, p) => sum + p.price, 0) / signupPackagePrices.length
+          )
+        : 265;
     const generatedInsights: Insight[] = [];
 
     // Filter out intros that are Completed or Cancelled for metrics calculations
@@ -53,7 +67,7 @@ export const useInsights = ({
         .join('\n');
 
       const potentialSignups = Math.round(warmLeads.length * 0.6);
-      const potentialRevenue = potentialSignups * MONTHLY_MEMBERSHIP_REVENUE;
+      const potentialRevenue = potentialSignups * avgMonthlyRevenue;
 
       generatedInsights.push({
         id: 'warm-leads',
@@ -82,7 +96,7 @@ export const useInsights = ({
     );
 
     if (travelCancels.length > 5) {
-      const lostRevenue = travelCancels.length * MONTHLY_MEMBERSHIP_REVENUE;
+      const lostRevenue = travelCancels.length * avgMonthlyRevenue;
       const holdRecovery = Math.round(travelCancels.length * 0.6);
       const holdRevenue = holdRecovery * 29;
 
@@ -180,7 +194,7 @@ These aren't lost causes - they're seasonal! Most travel cancellations will retu
         icon: 'UserMinus',
         color: 'orange',
         priority: 'high',
-        impact: `Reducing this by 50% = ${Math.round((count as number) / 2)} retained members = $${(Math.round((count as number) / 2) * MONTHLY_MEMBERSHIP_REVENUE).toLocaleString()}/month`,
+        impact: `Reducing this by 50% = ${Math.round((count as number) / 2)} retained members = $${(Math.round((count as number) / 2) * avgMonthlyRevenue).toLocaleString()}/month`,
         actions: specificActions,
         category: 'retention',
       });
@@ -195,7 +209,7 @@ These aren't lost causes - they're seasonal! Most travel cancellations will retu
       const targetRate = 0.8;
       const gap = targetRate - packageRate;
       const additionalPackages = Math.round(gap * totalFilteredSignups);
-      const revenue = additionalPackages * SIGNUP_PACKAGE_REVENUE;
+      const revenue = additionalPackages * avgPackageRevenue;
 
       generatedInsights.push({
         id: 'signup-package-opportunity',
@@ -294,7 +308,7 @@ Gap to 40%: ${gapTo40} additional signups needed`,
         icon: 'AlertTriangle',
         color: 'red',
         priority: 'high',
-        impact: `Reaching 40% = $${(gapTo40 * MONTHLY_MEMBERSHIP_REVENUE).toLocaleString()} monthly revenue`,
+        impact: `Reaching 40% = $${(gapTo40 * avgMonthlyRevenue).toLocaleString()} monthly revenue`,
         actions: [
           'Review intro class structure and sales process',
           'Check pricing against local competitors',
@@ -422,7 +436,7 @@ This concentration points to a retention issue specific to this demographic.`,
           icon: 'Users',
           color: 'orange',
           priority: 'high',
-          impact: `Retaining 50% of this group = $${(Math.round(ageCount * 0.5) * MONTHLY_MEMBERSHIP_REVENUE).toLocaleString()}/month`,
+          impact: `Retaining 50% of this group = $${(Math.round(ageCount * 0.5) * avgMonthlyRevenue).toLocaleString()}/month`,
           actions: [
             `Survey recent ${ageGroup} cancellations to identify the pattern`,
             `Review class schedule for ${ageGroup}-friendly time slots`,
@@ -466,7 +480,7 @@ Members on hold intend to return — a low return rate means re-activation is fa
           icon: 'RefreshCw',
           color: 'orange',
           priority: 'high',
-          impact: `Recovering 50% of non-returns = $${(Math.round(missedReturns * 0.5) * MONTHLY_MEMBERSHIP_REVENUE).toLocaleString()}/month`,
+          impact: `Recovering 50% of non-returns = $${(Math.round(missedReturns * 0.5) * avgMonthlyRevenue).toLocaleString()}/month`,
           actions: [
             'Contact hold members within 48 hours of their hold end date',
             'Create an automated re-activation reminder sequence',
@@ -516,7 +530,7 @@ After 30 days conversion drops to under 10%. A personal, compelling offer is the
         icon: 'Clock',
         color: 'orange',
         priority: 'high',
-        impact: `Even 10% conversion = ${Math.max(1, Math.round(staleLeads.length * 0.1))} signups = $${(Math.max(1, Math.round(staleLeads.length * 0.1)) * MONTHLY_MEMBERSHIP_REVENUE).toLocaleString()}/month`,
+        impact: `Even 10% conversion = ${Math.max(1, Math.round(staleLeads.length * 0.1))} signups = $${(Math.max(1, Math.round(staleLeads.length * 0.1)) * avgMonthlyRevenue).toLocaleString()}/month`,
         actions: [
           'Send a personal (not automated) message to each person',
           'Offer a limited-time re-intro or trial session',
@@ -544,7 +558,7 @@ These members are still in their honeymoon phase — the best window to upsell.`
         icon: 'DollarSign',
         color: 'green',
         priority: 'medium',
-        impact: `${recentWithoutPkg.length} package upgrades = $${(recentWithoutPkg.length * SIGNUP_PACKAGE_REVENUE).toLocaleString()} immediate revenue`,
+        impact: `${recentWithoutPkg.length} package upgrades = $${(recentWithoutPkg.length * avgPackageRevenue).toLocaleString()} immediate revenue`,
         actions: [
           'Reach out to these members this week with a personal package offer',
           'Emphasize retention benefit: "40% more likely to still be here in 3 months"',
@@ -581,7 +595,7 @@ The 60-day window is critical — after that, habits change and re-engagement be
         icon: 'Users',
         color: 'blue',
         priority: 'high',
-        impact: `Re-engaging 30% = ${Math.max(1, Math.round(reEngageable.length * 0.3))} members = $${(Math.max(1, Math.round(reEngageable.length * 0.3)) * MONTHLY_MEMBERSHIP_REVENUE).toLocaleString()}/month`,
+        impact: `Re-engaging 30% = ${Math.max(1, Math.round(reEngageable.length * 0.3))} members = $${(Math.max(1, Math.round(reEngageable.length * 0.3)) * avgMonthlyRevenue).toLocaleString()}/month`,
         actions: [
           'Make a personal call or text (not email) to each person',
           'Ask: "Has anything changed since you left?"',

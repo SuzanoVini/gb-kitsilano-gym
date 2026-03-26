@@ -14,6 +14,11 @@ import { SignupModals } from './modals/SignupModals';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+function getSignupYear(signup: Signup): string {
+  const d = signup.membership_date ? new Date(signup.membership_date) : new Date(signup.created_at);
+  return Number.isNaN(d.getTime()) ? '' : String(d.getFullYear());
+}
+
 export default function SignupsTab() {
   const { signups, loading, error, removeSignup, refresh } = useSignups();
   const { openModal, closeModal } = useUIStore();
@@ -130,16 +135,22 @@ export default function SignupsTab() {
     }
   };
 
+  const availableYears = useMemo(() => {
+    const years = new Set(signups.map(getSignupYear).filter(Boolean));
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [signups]);
+
   const filteredAndSearchedSignups = useMemo(() => {
     let filtered = signups;
 
     // Apply existing filters
     filtered = filtered.filter((signup) => {
+      const matchesYear = filters.year === 'all' || getSignupYear(signup) === filters.year;
       const matchesMonth = filters.month === 'all' || signup.month === filters.month;
       const matchesMembership =
         filters.membership === 'all' ||
         (signup.membership && signup.membership === filters.membership);
-      return matchesMonth && matchesMembership;
+      return matchesYear && matchesMonth && matchesMembership;
     });
 
     // Apply search filter
@@ -384,7 +395,7 @@ export default function SignupsTab() {
       </div>
 
       <div className="section-container">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="form-label" htmlFor="signups-sort">
               Sort By
@@ -397,6 +408,24 @@ export default function SignupsTab() {
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label" htmlFor="signups-year">
+              Year
+            </label>
+            <select
+              id="signups-year"
+              value={filters.year}
+              onChange={(e) => setFilters({ year: e.target.value })}
+              className="form-select"
+            >
+              <option value="all">All Years</option>
+              {availableYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
             </select>
           </div>
           <div>

@@ -16,6 +16,11 @@ import { CancellationModals } from './modals/CancellationModals';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const AGE_GROUPS = ['3-6 YO', '7-9 YO', '10-15 YO', 'Adult'];
 
+function getCancellationYear(c: Cancellation): string {
+  const d = c.date ? new Date(c.date) : new Date(c.created_at);
+  return Number.isNaN(d.getTime()) ? '' : String(d.getFullYear());
+}
+
 export default function CancellationsTab() {
   const { cancellations, loading, error, removeCancellation, refresh } = useCancellations();
   const { openModal, closeModal } = useUIStore();
@@ -148,16 +153,23 @@ export default function CancellationsTab() {
     alert('✅ Cancellations exported successfully!');
   };
 
+  const availableYears = useMemo(() => {
+    const years = new Set(cancellations.map(getCancellationYear).filter(Boolean));
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [cancellations]);
+
   const filteredAndSearchedCancellations = useMemo(() => {
     let filtered = cancellations;
 
     // Apply existing filters
     filtered = filtered.filter((cancellation) => {
+      const matchesYear =
+        filters.year === 'all' || getCancellationYear(cancellation) === filters.year;
       const matchesMonth = filters.month === 'all' || cancellation.month === filters.month;
       const matchesReason = filters.reason === 'all' || cancellation.reason === filters.reason;
       const matchesAgeGroup =
         filters.ageGroup === 'all' || cancellation.age_group === filters.ageGroup;
-      return matchesMonth && matchesReason && matchesAgeGroup;
+      return matchesYear && matchesMonth && matchesReason && matchesAgeGroup;
     });
 
     // Apply search filter
@@ -390,7 +402,7 @@ export default function CancellationsTab() {
       </div>
 
       <div className="section-container">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="form-label" htmlFor="cancellations-sort">
               Sort By
@@ -403,6 +415,24 @@ export default function CancellationsTab() {
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label" htmlFor="cancellations-year">
+              Year
+            </label>
+            <select
+              id="cancellations-year"
+              value={filters.year}
+              onChange={(e) => setFilters({ year: e.target.value })}
+              className="form-select"
+            >
+              <option value="all">All Years</option>
+              {availableYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
             </select>
           </div>
           <div>

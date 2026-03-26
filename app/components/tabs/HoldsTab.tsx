@@ -15,6 +15,11 @@ import { HoldModals } from './modals/HoldModals';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+function getHoldYear(hold: Hold): string {
+  const d = hold.start ? new Date(hold.start) : new Date(hold.created_at);
+  return Number.isNaN(d.getTime()) ? '' : String(d.getFullYear());
+}
+
 export default function HoldsTab() {
   const { holds, loading, error, removeHold, refresh } = useHolds();
   const { openModal, closeModal } = useUIStore();
@@ -164,11 +169,17 @@ export default function HoldsTab() {
     return 'active';
   }, []);
 
+  const availableYears = useMemo(() => {
+    const years = new Set(holds.map(getHoldYear).filter(Boolean));
+    return Array.from(years).sort((a, b) => Number(b) - Number(a));
+  }, [holds]);
+
   const filteredAndSearchedHolds = useMemo(() => {
     let filtered = holds;
 
     // Apply existing filters
     filtered = filtered.filter((hold) => {
+      const matchesYear = filters.year === 'all' || getHoldYear(hold) === filters.year;
       const matchesMonth = filters.month === 'all' || hold.month === filters.month;
       const matchesReason =
         filters.reason === 'all' || (hold.reason && hold.reason === filters.reason);
@@ -179,7 +190,7 @@ export default function HoldsTab() {
         matchesStatus = status === filters.holdStatus;
       }
 
-      return matchesMonth && matchesReason && matchesStatus;
+      return matchesYear && matchesMonth && matchesReason && matchesStatus;
     });
 
     // Apply search filter
@@ -418,7 +429,7 @@ export default function HoldsTab() {
       </div>
 
       <div className="section-container">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="form-label" htmlFor="holds-sort">
               Sort By
@@ -431,6 +442,24 @@ export default function HoldsTab() {
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label" htmlFor="holds-year">
+              Year
+            </label>
+            <select
+              id="holds-year"
+              value={filters.year}
+              onChange={(e) => setFilters({ year: e.target.value })}
+              className="form-select"
+            >
+              <option value="all">All Years</option>
+              {availableYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
             </select>
           </div>
           <div>

@@ -301,6 +301,14 @@ export interface ChartData {
 // Insight Types
 // ============================================================================
 
+/**
+ * A membership or package price entry used for configurable revenue estimates in insights
+ */
+export interface PriceEntry {
+  type: string;
+  price: number;
+}
+
 export type InsightPriority = 'critical' | 'high' | 'medium' | 'low';
 
 export type InsightCategory = 'conversion' | 'retention' | 'financial' | 'operational' | 'growth';

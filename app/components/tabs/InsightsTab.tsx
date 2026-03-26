@@ -7,6 +7,7 @@ import {
   Clock,
   DollarSign,
   RefreshCw,
+  Settings,
   Target,
   TrendingUp,
   Users,
@@ -16,7 +17,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAnalyticsData } from '@/hooks/useAnalyticsData';
 import { useDismissedInsights } from '@/hooks/useDismissedInsights';
 import { useInsights } from '@/hooks/useInsights';
-import type { Insight } from '@/types';
+import { fetchSettings, updateSettings } from '@/lib/supabase/settings';
+import type { Insight, PriceEntry } from '@/types';
 import { InsightCard } from './InsightCard';
 
 // Compute a stable hash from serialized insight data — defined at module level
@@ -44,6 +46,16 @@ export default function InsightsTab() {
   const [tempEndDate, setTempEndDate] = useState('');
   const [showDismissed, setShowDismissed] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [membershipPrices, setMembershipPrices] = useState<PriceEntry[]>([]);
+  const [signupPackagePrices, setSignupPackagePrices] = useState<PriceEntry[]>([]);
+
+  useEffect(() => {
+    fetchSettings('membership_prices').then((data) => setMembershipPrices(data as PriceEntry[]));
+    fetchSettings('signup_package_prices').then((data) =>
+      setSignupPackagePrices(data as PriceEntry[])
+    );
+  }, []);
 
   const { filteredData, allData, loading, error, refresh } = useAnalyticsData({
     dateRange,
@@ -54,6 +66,8 @@ export default function InsightsTab() {
   const { insights } = useInsights({
     ...filteredData,
     rawHolds: allData.holds,
+    membershipPrices,
+    signupPackagePrices,
   });
 
   const { isDismissed, markDone, snooze, dismiss, restore, dismissed } = useDismissedInsights();
@@ -221,10 +235,21 @@ export default function InsightsTab() {
                 Actionable recommendations based on your actual data
               </p>
             </div>
-            <button type="button" onClick={refresh} className="btn btn-primary">
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowPricingModal(true)}
+                className="btn bg-gray-100 text-gray-700 hover:bg-gray-200"
+                title="Configure membership prices used in revenue estimates"
+              >
+                <Settings className="w-4 h-4" />
+                Pricing
+              </button>
+              <button type="button" onClick={refresh} className="btn btn-primary">
+                <RefreshCw className="w-4 h-4" />
+                Refresh
+              </button>
+            </div>
           </div>
 
           {/* Date Range Filter */}
@@ -398,6 +423,135 @@ export default function InsightsTab() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Pricing Settings Modal */}
+      {showPricingModal && (
+        <PricingModal
+          membershipPrices={membershipPrices}
+          signupPackagePrices={signupPackagePrices}
+          onSave={(mp, spp) => {
+            setMembershipPrices(mp);
+            setSignupPackagePrices(spp);
+          }}
+          onClose={() => setShowPricingModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inline pricing modal — kept here to avoid an extra file import
+// ---------------------------------------------------------------------------
+
+interface PricingModalProps {
+  membershipPrices: PriceEntry[];
+  signupPackagePrices: PriceEntry[];
+  onSave: (mp: PriceEntry[], spp: PriceEntry[]) => void;
+  onClose: () => void;
+}
+
+function PricingModal({
+  membershipPrices,
+  signupPackagePrices,
+  onSave,
+  onClose,
+}: PricingModalProps) {
+  const [mp, setMp] = useState<PriceEntry[]>(membershipPrices);
+  const [spp, setSpp] = useState<PriceEntry[]>(signupPackagePrices);
+  const [saving, setSaving] = useState(false);
+
+  const updateMpPrice = (index: number, price: number) => {
+    setMp((prev) => prev.map((p, i) => (i === index ? { ...p, price } : p)));
+  };
+
+  const updateSppPrice = (index: number, price: number) => {
+    setSpp((prev) => prev.map((p, i) => (i === index ? { ...p, price } : p)));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateSettings('membership_prices', mp);
+      await updateSettings('signup_package_prices', spp);
+      onSave(mp, spp);
+      onClose();
+    } catch {
+      alert('Failed to save pricing. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <h3 className="text-lg font-bold mb-1">Revenue Estimate Prices</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          These prices are used only for revenue impact estimates in insights. They do not affect
+          billing.
+        </p>
+
+        <div className="mb-4">
+          <h4 className="text-sm font-semibold text-gray-700 mb-2">Monthly Membership Prices</h4>
+          <div className="space-y-2">
+            {mp.map((entry, i) => (
+              <div key={entry.type} className="flex items-center gap-3">
+                <span className="text-sm text-gray-700 w-28">{entry.type}</span>
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={entry.price}
+                    onChange={(e) => updateMpPrice(i, Number(e.target.value))}
+                    className="form-input pl-6 w-full"
+                  />
+                </div>
+                <span className="text-xs text-gray-400">/mo</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <h4 className="text-sm font-semibold text-gray-700 mb-2">Signup Package Prices</h4>
+          <div className="space-y-2">
+            {spp.map((entry, i) => (
+              <div key={entry.type} className="flex items-center gap-3">
+                <span className="text-sm text-gray-700 w-28">{entry.type}</span>
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={entry.price}
+                    onChange={(e) => updateSppPrice(i, Number(e.target.value))}
+                    className="form-input pl-6 w-full"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn bg-gray-100 text-gray-700 hover:bg-gray-200"
+          >
+            Cancel
+          </button>
+          <button type="button" onClick={handleSave} disabled={saving} className="btn btn-primary">
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
       </div>
     </div>
   );
